@@ -41,6 +41,9 @@ jobs:
       # ── Package DMG ──────────────────────────────────────
       - name: Package DMG
         run: bash package.sh
+        env:
+          # Strip the leading "v" from the tag so DMG is named Popy-1.0.1.dmg
+          POPY_VERSION: ${{ github.ref_name }}
 
       - name: Prepare release assets
         id: assets

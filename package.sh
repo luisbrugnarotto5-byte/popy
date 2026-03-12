@@ -45,9 +45,16 @@ fi
 
 info "Found: $APP_PATH"
 
-# Read version from Info.plist
-APP_VERSION=$(defaults read "$PROJECT_DIR/$APP_PATH/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "1.0.0")
-info "Version: $APP_VERSION"
+# Version: prefer POPY_VERSION env var (set by CI from the git tag),
+# fall back to reading Info.plist, then default to 1.0.0
+if [ -n "${POPY_VERSION:-}" ]; then
+    # Strip leading "v" if present (e.g. "v1.0.1" -> "1.0.1")
+    APP_VERSION="${POPY_VERSION#v}"
+    info "Version (from env): $APP_VERSION"
+else
+    APP_VERSION=$(defaults read "$PROJECT_DIR/$APP_PATH/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "1.0.0")
+    info "Version (from plist): $APP_VERSION"
+fi
 
 # --------------------------------------------------
 # 2. Prepare staging directory

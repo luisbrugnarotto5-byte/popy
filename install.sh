@@ -47,10 +47,14 @@ info "Downloaded to $TMP_DIR/$DMG_NAME"
 # ── 3. Mount & copy ──────────────────────────────────────
 step "Installing Popy.app to /Applications..."
 
-MOUNT_DIR=$(hdiutil attach "$TMP_DIR/$DMG_NAME" -nobrowse -quiet 2>&1 | grep "/Volumes/" | sed 's/.*\/Volumes/\/Volumes/')
+MOUNT_DIR="$TMP_DIR/mount"
+mkdir -p "$MOUNT_DIR"
 
-if [ -z "$MOUNT_DIR" ] || [ ! -d "$MOUNT_DIR" ]; then
-    fail "Failed to mount DMG."
+# Mount explicitly so we always know the path
+hdiutil attach "$TMP_DIR/$DMG_NAME" -nobrowse -quiet -mountpoint "$MOUNT_DIR" || fail "Failed to mount DMG."
+
+if [ ! -d "$MOUNT_DIR" ]; then
+    fail "Mountpoint not found: $MOUNT_DIR"
 fi
 
 if [ ! -d "$MOUNT_DIR/Popy.app" ]; then

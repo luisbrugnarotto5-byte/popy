@@ -8,6 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let clipboardManager = ClipboardManager.shared
     private let loginItemManager = LoginItemManager.shared
     private let preferences = PreferencesManager.shared
+    private let updateManager = UpdateManager.shared
 
     // MARK: - App Lifecycle
 
@@ -126,7 +127,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         loginItem.state = loginItemManager.isEnabled ? .on : .off
         menu.addItem(loginItem)
 
-        // ── Quit ─────────────────────────────────────────────
+        // ── Updates & Quit ────────────────────────────────────
+        menu.addItem(NSMenuItem.separator())
+
+        let updateItem = NSMenuItem(title: "Check for Updates...", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = self
+        menu.addItem(updateItem)
+
+        let versionItem = NSMenuItem(title: "v\(updateManager.currentVersion)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        let versionAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 10),
+            .foregroundColor: NSColor.tertiaryLabelColor
+        ]
+        versionItem.attributedTitle = NSAttributedString(string: "v\(updateManager.currentVersion)", attributes: versionAttributes)
+        menu.addItem(versionItem)
+
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(title: "Quit Popy", action: #selector(quitApp(_:)), keyEquivalent: "q")
@@ -191,6 +207,57 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newState = !loginItemManager.isEnabled
         loginItemManager.setEnabled(newState)
         buildMenu()
+    }
+
+    @objc private func checkForUpdates(_ sender: NSMenuItem) {
+        updateManager.checkForUpdates { [weak self] result in
+            guard self != nil else { return }
+            switch result {
+            case .upToDate:
+                self?.showAlert(
+                    title: "You're up to date",
+                    message: "Popy v\(UpdateManager.shared.currentVersion) is the latest version.",
+                    showDownload: false
+                )
+            case .updateAvailable(let latestVersion, let downloadURL):
+                self?.showAlert(
+                    title: "Update available",
+                    message: "Popy v\(latestVersion) is available (you have v\(UpdateManager.shared.currentVersion)).",
+                    showDownload: true,
+                    downloadURL: downloadURL
+                )
+            case .error(let message):
+                self?.showAlert(
+                    title: "Update check failed",
+                    message: message,
+                    showDownload: false
+                )
+            }
+        }
+    }
+
+    private func showAlert(title: String, message: String, showDownload: Bool, downloadURL: String? = nil) {
+        // Bring our process to front so the alert is visible (we're an LSUIElement app)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+
+        if showDownload, let urlString = downloadURL {
+            alert.addButton(withTitle: "Download")
+            alert.addButton(withTitle: "Later")
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                if let url = URL(string: urlString) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+        } else {
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+        }
     }
 
     @objc private func quitApp(_ sender: NSMenuItem) {

@@ -13,15 +13,19 @@ set -euo pipefail
 BOLD="\033[1m"
 GREEN="\033[0;32m"
 RED="\033[0;31m"
+YELLOW="\033[0;33m"
 RESET="\033[0m"
 
 info() { echo -e "${GREEN}[✓]${RESET} $1"; }
+warn() { echo -e "${YELLOW}[!]${RESET} $1"; }
 fail() { echo -e "${RED}[✗]${RESET} $1"; exit 1; }
 step() { echo -e "\n${BOLD}→ $1${RESET}"; }
+debug() { [ -n "${POPY_DEBUG:-}" ] && echo -e "${YELLOW}[debug]${RESET} $1"; }
 
 REPO="anuragxxd/popy"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
+debug "TMP_DIR=$TMP_DIR"
 
 # ── 1. Fetch latest release info ──────────────────────────
 step "Finding latest Popy release..."
@@ -37,6 +41,7 @@ fi
 
 DMG_NAME=$(basename "$DMG_URL")
 info "Found: $DMG_NAME"
+debug "DMG_URL=$DMG_URL"
 
 # ── 2. Download ───────────────────────────────────────────
 step "Downloading $DMG_NAME..."
@@ -48,29 +53,48 @@ info "Downloaded to $TMP_DIR/$DMG_NAME"
 step "Installing Popy.app to /Applications..."
 
 MOUNT_DIR="$TMP_DIR/mount"
+INSTALL_DIR="/Applications"
+SUDO=""
+MOUNTED=0
+
 mkdir -p "$MOUNT_DIR"
 
 # Mount explicitly so we always know the path
-hdiutil attach "$TMP_DIR/$DMG_NAME" -nobrowse -quiet -mountpoint "$MOUNT_DIR" || fail "Failed to mount DMG."
+MOUNT_ERR="$TMP_DIR/mount.err"
+debug "Mounting DMG to $MOUNT_DIR"
+if ! hdiutil attach "$TMP_DIR/$DMG_NAME" -nobrowse -quiet -mountpoint "$MOUNT_DIR" 2>"$MOUNT_ERR"; then
+    fail "Failed to mount DMG: $(cat "$MOUNT_ERR")"
+fi
+MOUNTED=1
+debug "Mounted DMG"
 
 if [ ! -d "$MOUNT_DIR" ]; then
     fail "Mountpoint not found: $MOUNT_DIR"
 fi
 
+debug "Checking for $MOUNT_DIR/Popy.app"
 if [ ! -d "$MOUNT_DIR/Popy.app" ]; then
     hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true
     fail "Popy.app not found inside DMG."
 fi
 
+# Use sudo if /Applications is not writable
+if [ ! -w "$INSTALL_DIR" ]; then
+    SUDO="sudo"
+    warn "/Applications is not writable. You'll be prompted for your password."
+fi
+
 # Remove old version if present
-if [ -d "/Applications/Popy.app" ]; then
-    rm -rf "/Applications/Popy.app"
+if [ -d "$INSTALL_DIR/Popy.app" ]; then
+    $SUDO rm -rf "$INSTALL_DIR/Popy.app"
     info "Removed previous version"
 fi
 
-cp -R "$MOUNT_DIR/Popy.app" /Applications/
-hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true
-info "Installed to /Applications/Popy.app"
+$SUDO cp -R "$MOUNT_DIR/Popy.app" "$INSTALL_DIR/"
+if [ $MOUNTED -eq 1 ]; then
+    hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true
+fi
+info "Installed to $INSTALL_DIR/Popy.app"
 
 # ── 4. Launch ─────────────────────────────────────────────
 step "Launching Popy..."

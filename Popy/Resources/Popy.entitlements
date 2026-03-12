@@ -5,10 +5,8 @@
     <!-- Non-sandboxed: required for NSPasteboard monitoring and CGEvent simulation -->
     <key>com.apple.security.app-sandbox</key>
     <false/>
-    <!-- Keychain access group scoped to this app's bundle ID -->
-    <key>keychain-access-groups</key>
-    <array>
-        <string>com.popy.app</string>
-    </array>
+    <!-- get-task-allow: allow debugging in dev builds -->
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
 </dict>
 </plist>
